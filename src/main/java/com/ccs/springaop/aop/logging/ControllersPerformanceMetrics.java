@@ -1,12 +1,13 @@
 package com.ccs.springaop.aop.logging;
 
-import lombok.*;
+import jakarta.annotation.PreDestroy;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -15,57 +16,70 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Aspect
 @Component
-@ConditionalOnProperty(value = "app.controllersperformance.enabled", havingValue = "true")
-public class ControllersPerformance {
+@ConditionalOnProperty(value = "app.controllersperformancemetrics.enabled", havingValue = "true")
+@Slf4j
+public class ControllersPerformanceMetrics {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ControllersPerformance.class);
+    public ControllersPerformanceMetrics() {
+        log.info("###-> ControllersPerformanceMetrics - initialized");
+    }
 
     private final Map<String, Telemetry> telemetryMap = new ConcurrentHashMap<>();
 
+    @PreDestroy
+    public void destroy() {
+        telemetryMap.forEach((s, telemetry) -> log.info("###-> ControllersPerformanceMetrics - {}", telemetry));
+    }
+
     @Around("execution(* com.ccs.springaop.controller..*(..))")
     public Object aroundController(ProceedingJoinPoint joinPoint) throws Throwable {
-        long start = System.currentTimeMillis();
-        String controllerName = getControllerName(joinPoint);
+        long start = System.nanoTime();
+        String endpointMethodName = getendpointMethodName(joinPoint);
 
         Object result = joinPoint.proceed();
 
-        long totalTime = System.currentTimeMillis() - start;
-        updateTelemetry(controllerName, totalTime);
+        long totalTime = System.nanoTime() - start;
+        updateTelemetry(endpointMethodName, totalTime);
 
-        LOGGER.debug("Controller {} called {} times", controllerName, telemetryMap.get(controllerName).getExecutionCount());
+        log.info("Controller {} called {} times", endpointMethodName, telemetryMap.get(endpointMethodName).getExecutionCount());
         return result;
     }
 
-    private String getControllerName(ProceedingJoinPoint joinPoint) {
+    private String getendpointMethodName(ProceedingJoinPoint joinPoint) {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         return signature.getDeclaringType().getSimpleName() + "#" + signature.getName();
     }
 
-    private void updateTelemetry(String controllerName, long totalTime) {
-        telemetryMap.compute(controllerName, (key, existingTelemetry) -> {
+    private void updateTelemetry(String endpointMethodName, long totalTime) {
+        telemetryMap.compute(endpointMethodName, (key, existingTelemetry) -> {
             if (existingTelemetry == null) {
-                return new Telemetry(controllerName, totalTime, 1, totalTime, totalTime, totalTime, totalTime);
+                return Telemetry.builder().
+                        endpointMethodName(endpointMethodName)
+                        .totalExecutionTime((double) totalTime)
+                        .executionCount(1L)
+                        .worst((double) totalTime)
+                        .best((double) totalTime)
+                        .last((double) totalTime)
+                        .average((double) totalTime)
+                        .build();
             }
-            return existingTelemetry.update(totalTime);
+            return existingTelemetry.update((double) totalTime);
         });
     }
 
+    @Builder
+    private static class Telemetry {
 
+        private String endpointMethodName;
+        private Double totalExecutionTime;
+        @Getter
+        private Long executionCount;
+        private Double worst;
+        private Double best;
+        private Double last;
+        private Double average;
 
-
-    @Data
-    @AllArgsConstructor
-    private class Telemetry {
-
-        private String controllerName;
-        private long totalExecutionTime;
-        private long executionCount;
-        private long worst;
-        private long best;
-        private long last;
-        private long average;
-
-        public Telemetry update(long totalTime) {
+        public Telemetry update(Double totalTime) {
             executionCount++;
             totalExecutionTime += totalTime;
             worst = Math.max(worst, totalTime);
@@ -73,6 +87,19 @@ public class ControllersPerformance {
             last = totalTime;
             average = totalExecutionTime / executionCount;
             return this;
+        }
+
+        @Override
+        public String toString() {
+            return "Telemetry{"
+                    .concat("controllerName=" + endpointMethodName + '\'')
+                    .concat(", totalExecutionTime=" + (totalExecutionTime/ 1_000_000)).concat("ms")
+                    .concat(", executionCount=" + executionCount)
+                    .concat(", worst=" + worst).concat("ns")
+                    .concat(", best=" + best).concat("ns")
+                    .concat(", last=" + last).concat("ns")
+                    .concat(", average=" + average).concat("ms")
+                    .concat("'}'");
         }
     }
 }

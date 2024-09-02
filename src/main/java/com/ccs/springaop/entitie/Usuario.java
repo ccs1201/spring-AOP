@@ -1,20 +1,42 @@
-package com.ccs.springaop.usuario;
+package com.ccs.springaop.entitie;
 
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.Objects;
 
 @Getter
 @Setter
-@ToString
-@Builder
-AllArgsConstructor
-@NoArgsConstructor
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-
 public class Usuario {
 
-    @EqualsAndHashCode.Include
     private int id;
     private String nome;
     private String email;
-    private String senha;
+
+    public Usuario(int id, String nome, String email) {
+        this.id = id;
+        this.nome = nome;
+        this.email = email;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Usuario usuario)) return false;
+        return id == usuario.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(id);
+    }
+
+    @Override
+    public String toString() {
+        return "Usuario{" +
+                "id=" + id +
+                ", nome='" + nome + '\'' +
+                ", email='" + email + '\'' +
+                '}';
+    }
 }
