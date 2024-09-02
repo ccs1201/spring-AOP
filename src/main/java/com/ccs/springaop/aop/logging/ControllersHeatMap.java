@@ -14,9 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Aspect
 @Component
 @ConditionalOnProperty(value = "app.controllersheathmap.enabled", havingValue = "true")
-public class ControllersHeathMap {
+public class ControllersHeatMap {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ControllersHeathMap.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ControllersHeatMap.class);
     private final Map<String, Integer> healthMap = new ConcurrentHashMap<>();
 
     @Before("execution(* com.ccs.springaop.controller..*(..))")
