@@ -41,7 +41,8 @@ public class ControllersPerformanceMetrics {
         long totalTime = System.nanoTime() - start;
         updateTelemetry(endpointMethodName, totalTime);
 
-        log.info("Controller {} called {} times", endpointMethodName, telemetryMap.get(endpointMethodName).getExecutionCount());
+        log.info("Controller {} executado {} vezes Retornando: {}",
+                endpointMethodName, telemetryMap.get(endpointMethodName).getExecutionCount(), result);
         return result;
     }
 
