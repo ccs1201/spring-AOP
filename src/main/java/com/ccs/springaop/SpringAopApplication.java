@@ -26,7 +26,6 @@ public class SpringAopApplication {
     @Bean
     CommandLineRunner commandLineRunner() {
         return args -> {
-
             for (int i = 1; i <= 5; i++) {
                 Usuario usuario = criarUsuario(i);
                 usuarioService.salvar(usuario);
@@ -37,7 +36,6 @@ public class SpringAopApplication {
     }
 
     private static Usuario criarUsuario(int i) {
-
         return new Usuario(i, "Usuario " + i, "usuario" + i + "@email.com");
     }
 

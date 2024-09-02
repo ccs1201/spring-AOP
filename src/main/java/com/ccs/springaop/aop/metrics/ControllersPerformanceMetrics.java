@@ -1,4 +1,4 @@
-package com.ccs.springaop.aop.logging;
+package com.ccs.springaop.aop.metrics;
 
 import jakarta.annotation.PreDestroy;
 import lombok.Builder;
@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Aspect
@@ -53,18 +54,18 @@ public class ControllersPerformanceMetrics {
 
     private void updateTelemetry(String endpointMethodName, long totalTime) {
         telemetryMap.compute(endpointMethodName, (key, existingTelemetry) -> {
-            if (existingTelemetry == null) {
+            if (Objects.isNull(existingTelemetry)) {
                 return Telemetry.builder().
                         endpointMethodName(endpointMethodName)
-                        .totalExecutionTime((double) totalTime)
+                        .totalExecutionTime(totalTime)
                         .executionCount(1L)
-                        .worst((double) totalTime)
-                        .best((double) totalTime)
-                        .last((double) totalTime)
+                        .worst(totalTime)
+                        .best(totalTime)
+                        .last(totalTime)
                         .average((double) totalTime)
                         .build();
             }
-            return existingTelemetry.update((double) totalTime);
+            return existingTelemetry.update(totalTime);
         });
     }
 
@@ -72,34 +73,36 @@ public class ControllersPerformanceMetrics {
     private static class Telemetry {
 
         private String endpointMethodName;
-        private Double totalExecutionTime;
+        private long totalExecutionTime;
         @Getter
-        private Long executionCount;
-        private Double worst;
-        private Double best;
-        private Double last;
-        private Double average;
+        private long executionCount;
+        private long worst;
+        private long best;
+        private long last;
+        private double average;
 
-        public Telemetry update(Double totalTime) {
-            executionCount++;
-            totalExecutionTime += totalTime;
-            worst = Math.max(worst, totalTime);
-            best = Math.min(best, totalTime);
-            last = totalTime;
-            average = totalExecutionTime / executionCount;
-            return this;
+        public Telemetry update(long totalTime) {
+            synchronized (this) {
+                executionCount++;
+                totalExecutionTime += totalTime;
+                worst = Math.max(worst, totalTime);
+                best = Math.min(best, totalTime);
+                last = totalTime;
+                average = totalExecutionTime / (double) executionCount;
+                return this;
+            }
         }
 
         @Override
         public String toString() {
             return "Telemetry{"
                     .concat("controllerName=" + endpointMethodName + '\'')
-                    .concat(", totalExecutionTime=" + (totalExecutionTime/ 1_000_000)).concat("ms")
+                    .concat(", totalExecutionTime=" + (totalExecutionTime / 1_000_000)).concat("ms")
                     .concat(", executionCount=" + executionCount)
                     .concat(", worst=" + worst).concat("ns")
                     .concat(", best=" + best).concat("ns")
                     .concat(", last=" + last).concat("ns")
-                    .concat(", average=" + average).concat("ms")
+                    .concat(", average=" + average).concat("ns")
                     .concat("'}'");
         }
     }
