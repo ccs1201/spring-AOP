@@ -15,7 +15,6 @@ public class UsuarioService {
         if (usuario.getId() == 0) {
             usuario.setId(usuarios.getLast().getId() + 1);
         }
-
         return usuarios.add(usuario);
     }
 

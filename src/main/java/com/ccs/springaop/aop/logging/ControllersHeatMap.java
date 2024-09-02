@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Aspect
 @Component
-@ConditionalOnProperty(value = "app.controllersheathmap.enabled", havingValue = "true")
+@ConditionalOnProperty(value = "app.controllersheatmap.enabled", havingValue = "true")
 public class ControllersHeatMap {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ControllersHeatMap.class);
