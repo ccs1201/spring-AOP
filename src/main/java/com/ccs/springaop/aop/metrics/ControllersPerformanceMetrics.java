@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Aspect
 @Component
@@ -25,7 +26,7 @@ public class ControllersPerformanceMetrics {
         log.info("###-> ControllersPerformanceMetrics - initialized");
     }
 
-    private final Map<String, Telemetry> telemetryMap = new ConcurrentHashMap<>();
+    private final Map<String, AtomicReference<Telemetry>> telemetryMap = new ConcurrentHashMap<>();
 
     @PreDestroy
     public void destroy() {
@@ -35,7 +36,7 @@ public class ControllersPerformanceMetrics {
     @Around("execution(* com.ccs.springaop.controller..*(..))")
     public Object aroundController(ProceedingJoinPoint joinPoint) throws Throwable {
         long start = System.nanoTime();
-        String endpointMethodName = getendpointMethodName(joinPoint);
+        String endpointMethodName = getEndpointMethodName(joinPoint);
 
         Object result = joinPoint.proceed();
 
@@ -43,11 +44,11 @@ public class ControllersPerformanceMetrics {
         updateTelemetry(endpointMethodName, totalTime);
 
         log.info("Controller {} executado {} vezes Retornando: {}",
-                endpointMethodName, telemetryMap.get(endpointMethodName).getExecutionCount(), result);
+                endpointMethodName, telemetryMap.get(endpointMethodName).get().getExecutionCount(), result);
         return result;
     }
 
-    private String getendpointMethodName(ProceedingJoinPoint joinPoint) {
+    private String getEndpointMethodName(ProceedingJoinPoint joinPoint) {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         return signature.getDeclaringType().getSimpleName() + "#" + signature.getName();
     }
@@ -55,17 +56,19 @@ public class ControllersPerformanceMetrics {
     private void updateTelemetry(String endpointMethodName, long totalTime) {
         telemetryMap.compute(endpointMethodName, (key, existingTelemetry) -> {
             if (Objects.isNull(existingTelemetry)) {
-                return Telemetry.builder().
-                        endpointMethodName(endpointMethodName)
-                        .totalExecutionTime(totalTime)
-                        .executionCount(1L)
-                        .worst(totalTime)
-                        .best(totalTime)
-                        .last(totalTime)
-                        .average((double) totalTime)
-                        .build();
+                return new AtomicReference<>(
+                        Telemetry.builder().
+                                endpointMethodName(endpointMethodName)
+                                .totalExecutionTime(totalTime)
+                                .executionCount(1L)
+                                .worst(totalTime)
+                                .best(totalTime)
+                                .last(totalTime)
+                                .average((double) totalTime)
+                                .build());
             }
-            return existingTelemetry.update(totalTime);
+            existingTelemetry.get().update(totalTime);
+            return existingTelemetry;
         });
     }
 
@@ -81,16 +84,13 @@ public class ControllersPerformanceMetrics {
         private long last;
         private double average;
 
-        public Telemetry update(long totalTime) {
-            synchronized (this) {
-                executionCount++;
-                totalExecutionTime += totalTime;
-                worst = Math.max(worst, totalTime);
-                best = Math.min(best, totalTime);
-                last = totalTime;
-                average = totalExecutionTime / (double) executionCount;
-                return this;
-            }
+        public void update(long totalTime) {
+            executionCount++;
+            totalExecutionTime += totalTime;
+            worst = Math.max(worst, totalTime);
+            best = Math.min(best, totalTime);
+            last = totalTime;
+            average = totalExecutionTime / (double) executionCount;
         }
 
         @Override
